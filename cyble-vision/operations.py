@@ -5,9 +5,13 @@ Copyright (c) 2024 Fortinet Inc
 Copyright end
 """
 
+from datetime import datetime, timezone
+from typing import Any, Dict, List
+
 import requests
-from datetime import datetime
 from connectors.core.connector import get_logger, ConnectorError
+
+# from .alertdata import Alertdata
 
 logger = get_logger('cyble-vision')
 
@@ -35,82 +39,315 @@ class CybleVision(object):
             'time_out': 'The request timed out while trying to connect to the remote server',
             'ssl_error': 'SSL certificate validation failed'}
 
-    def make_request(self, endpoint, headers=None, params=None, data=None, method='GET'):
+    def make_request(self, endpoint, method='GET', params=None, data=None, headers=None):
         try:
-            headers = {'X-API-KEY': self.token}
-            url = self.base_url + endpoint
-            response = requests.request(method, url, data=data, headers=headers, verify=self.verify_ssl, params=params)
+            if headers is None:
+                headers = {}
+            headers.update({
+                'Authorization': f'Bearer {self.token}',
+                'Accept': 'application/json'
+            })
 
-            if response.status_code == 200 or response.status_code == 206:
-                return response.json()
-            if self.error_msg[response.status_code]:
-                logger.error('{}'.format(response.content))
-                raise ConnectorError('{}'.format(self.error_msg[response.status_code]))
-            response.raise_for_status()
+            url = f'{self.base_url}{endpoint}'
+            response = requests.request(
+                method=method,
+                url=url,
+                headers=headers,
+                params=params,
+                json=data if data else None,
+                verify=self.verify_ssl
+            )
+
+            if response.status_code in [200, 201, 206]:
+                return response.json() if response.text else {}
+
+            error_msg = self.error_msg.get(
+                response.status_code,
+                f'Unexpected response (HTTP {response.status_code})'
+            )
+            raise ConnectorError(f'{error_msg}: {response.text}')
+
         except requests.exceptions.SSLError as e:
-            logger.exception('{}'.format(e))
-            raise ConnectorError('{}'.format(self.error_msg['ssl_error']))
-        except requests.exceptions.ConnectionError as e:
-            logger.exception('{}'.format(e))
-            raise ConnectorError('{}'.format(self.error_msg['time_out']))
+            raise ConnectorError(f'SSL Certificate Validation Failed: {str(e)}')
+        except requests.exceptions.RequestException as e:
+            raise ConnectorError(f'Request Failed: {str(e)}')
         except Exception as e:
-            logger.exception('{}'.format(e))
-            raise ConnectorError('{}'.format(e))
+            raise ConnectorError(f'Error: {str(e)}')
 
     def build_payload(self, params):
         result = {k: v for k, v in params.items() if v is not None and v != ''}
         return result
 
 
-def handle_datetime(date_ts):
+def format_datetime(dt: datetime) -> str:
+    """
+    Format datetime to specific format: YYYY-MM-DDThh:mm:ss.fffZ
+    """
+    return dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+
+
+def handle_datetime(date_ts: str) -> str:
+    """Convert datetime string to required format"""
     try:
-        conv_date_time = datetime.strptime(date_ts, '%Y-%m-%dT%H:%M:%S.%fZ').strftime("%Y-%m-%d")
-    except:
-        import sys
-        ver = sys.version_info
-        if ver.major == 3 and ver.minor == 6:
-            date_ts = date_ts[0:-3] + date_ts[-2:]
-        conv_date_time = datetime.strptime(date_ts, '%Y-%m-%dT%H:%M:%S.%fZ').strftime("%Y-%m-%d")
-    return conv_date_time
+        return datetime.strptime(date_ts, '%Y-%m-%dT%H:%M:%S.%fZ').strftime("%Y-%m-%d")
+    except ValueError as e:
+        logger.error(f"Error parsing datetime: {str(e)}")
+        raise ConnectorError(f"Invalid datetime format: {date_ts}")
 
 
-def fetch_indicators(config, params):
+def build_ioc_params(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Build parameters for IOC request"""
+    ioc_params = {
+        'ioc': params.get('ioc', ''),
+        'page': params.get('page', ''),
+        'limit': params.get('limit', ''),
+        'sortBy': params.get('sortBy', ''),
+        'order': params.get('order', '')
+    }
+
+    # Add optional parameters
+    if params.get('type'):
+        ioc_params['iocType'] = params['type']
+    if params.get('begin'):
+        ioc_params['startDate'] = handle_datetime(params['begin'])
+    if params.get('end'):
+        ioc_params['endDate'] = handle_datetime(params['end'])
+    if params.get('tags'):
+        ioc_params['tags'] = params['tags']
+
+    return {k: v for k, v in ioc_params.items() if v}
+
+
+def process_ioc_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Process IOC response and format the data"""
+    if not response.get('iocs'):
+        return []
+
+    processed_iocs = []
+    for ioc in response['iocs']:
+        processed_ioc = {
+            'ioc': str(ioc.get('ioc', '')),
+            'ioc_type': str(ioc.get('ioc_type', '')),
+            'first_seen': str(ioc.get('first_seen', '')),
+            'last_seen': str(ioc.get('last_seen', '')),
+            'risk_score': str(ioc.get('risk_score', '')),
+            'confidence_rating': str(ioc.get('confidence_rating', '')),
+            'sources': str(ioc.get('sources', [])),
+            'behaviour_tags': str(ioc.get('behaviour_tags', [])),
+            'target_countries': str(ioc.get('target_countries', [])),
+            'target_regions': str(ioc.get('target_regions', [])),
+            'target_industries': str(ioc.get('target_industries', [])),
+            'related_malware': str(ioc.get('related_malware', [])),
+            'related_threat_actors': str(ioc.get('related_threat_actors', []))
+        }
+        processed_iocs.append(processed_ioc)
+
+    return processed_iocs
+
+
+def fetch_indicators(config: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
+    """Fetch indicators from Cyble Vision"""
+    try:
+        api = CybleVision(config)
+
+        # Build and validate parameters
+        ioc_params = build_ioc_params(params)
+        logger.debug(f"Fetching indicators with params: {ioc_params}")
+        print(f"Fetching indicators with params: {ioc_params}")
+        # Make API request
+        response = api.make_request(
+            endpoint='/engine/api/v2/y/iocs',
+            method='GET',
+            params=ioc_params
+        )
+
+        # Process response
+        processed_iocs = process_ioc_response(response)
+        return {'iocs': processed_iocs}
+
+    except Exception as e:
+        logger.error(f"Error fetching indicators: {str(e)}")
+        raise ConnectorError(f"Failed to fetch indicators: {str(e)}")
+
+
+def build_alert_params(input_params: Dict[str, Any]) -> Dict[str, Any]:
+    """Build the alert request structure"""
+    return {
+        "orderBy": [{"created_at": input_params.get('sortBy', 'asc')}],
+        "select": {
+            "alert_group_id": True,
+            "archive_date": True,
+            "archived": True,
+            "assignee_id": True,
+            "assignment_date": True,
+            "created_at": True,
+            "data_id": True,
+            "deleted_at": True,
+            "description": True,
+            "hash": True,
+            "id": True,
+            "metadata": True,
+            "risk_score": True,
+            "service": True,
+            "severity": True,
+            "status": True,
+            "tags": True,
+            "updated_at": True,
+            "user_severity": True
+        },
+        "skip": 0,
+        "take": input_params.get('limit', 100),
+        "withDataMessage": True,
+        "where": {
+            "created_at": {
+                "gte": input_params.get('begin', ''),
+                "lte": input_params.get('end', '')
+            },
+            "status": {
+                "in": [
+                    "VIEWED",
+                    "UNREVIEWED",
+                    "CONFIRMED_INCIDENT",
+                    "UNDER_REVIEW",
+                    "INFORMATIONAL"
+                ]
+            }
+        }
+    }
+
+
+def fetch_alerts(config: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
+    """Fetch alerts from Cyble Vision"""
+    try:
+        api = CybleVision(config)
+
+        # Handle date parameters
+        for date_field in ['begin', 'end']:
+            if date_str := params.get(date_field):
+                try:
+                    dt = datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%S.%fZ')
+                    dt_utc = dt.replace(tzinfo=timezone.utc)
+                    params[date_field] = format_datetime(dt_utc)
+                except ValueError as e:
+                    logger.error(f"Error parsing {date_field}: {str(e)}")
+                    raise ConnectorError(f"Invalid date format for {date_field}: {date_str}")
+
+        # Build alert parameters
+        alert_params = build_alert_params(params)
+
+        print(f"Fetching alerts with params: {alert_params}")
+
+        # Make API request
+        response = api.make_request(
+            endpoint="/apollo/api/v1/y/alerts",
+            method='POST',
+            data=alert_params,
+            headers={"Content-Type": "application/json"}
+        )
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error fetching alerts: {str(e)}")
+        raise ConnectorError(f"Failed to fetch alerts: {str(e)}")
+
+
+def add_comment_to_alert(config, params):
     obj = CybleVision(config)
-    params = obj.build_payload(params)
-    if params.get('start_date'):
-        params['start_date'] = handle_datetime(params.get('start_date'))
-    if params.get('end_date'):
-        params['end_date'] = handle_datetime(params.get('end_date'))
-    response = obj.make_request(endpoint='/api/iocs', params=params)
+    endpoint = "/apollo/api/v1/y/alerts/{}/comments".format(params['alertID'])
+    data = {"content": params['comment']}
+    response = obj.make_request(endpoint=endpoint, method='POST', data=data)
     return response
 
 
-def fetch_alerts(config, params):
+def list_advisories(config, params):
     obj = CybleVision(config)
-    if params.get('start_date'):
-        params['start_date'] = handle_datetime(params.get('start_date'))
-    if params.get('end_date'):
-        params['end_date'] = handle_datetime(params.get('end_date'))
+    date1_obj = datetime.strptime(params['from'], "%Y-%m-%dT%H:%M:%S.%fZ")
+    date_from = date1_obj.strftime("%Y-%m-%d")
+    date2_obj = datetime.strptime(params['to'], "%Y-%m-%dT%H:%M:%S.%fZ")
+    date_to = date2_obj.strftime("%Y-%m-%d")
+    dateRange = date_from + "," + date_to
     params = obj.build_payload(params)
-    response = obj.make_request(endpoint='/api/v2/events/all', params=params)
+    params.update({"dateRange": dateRange})
+    del params['to']
+    del params['from']
+    response = obj.make_request(endpoint="/engine/api/v1/y/advisory", params=params)
     return response
 
 
-def fetch_event_detail(config, params):
+def get_advisory_details(config, params):
     obj = CybleVision(config)
-    event_type = params.get("event_type")
-    event_id = params.get("event_id")
-    params.pop('event_type')
-    params.pop('event_id')
-    params = obj.build_payload(params)
-    response = obj.make_request(endpoint='/api/v2/events/{0}/{1}'.format(event_type, event_id), params=params)
+    endpoint = "/engine/api/v1/y/advisory/{}".format(params['advisoryID'])
+    headers = {"accept": "application/pdf"}
+    response = obj.make_request(endpoint=endpoint, headers=headers)
     return response
+
+
+def fetch_companies(config, params):
+    obj = CybleVision(config)
+    response = obj.make_request(endpoint="/apollo/api/v1/y/companies")
+    return response
+
+
+def fetch_ip_details(config, params):
+    obj = CybleVision(config)
+    endpoint = "/engine/api/v1/y/asm/details/{companyId}/ip/{ip}".format(companyId=params['companyId'],
+                                                                         ip=params['addressIP'])
+    response = obj.make_request(endpoint=endpoint)
+    return response
+
+
+def fetch_cve_details(config, params):
+    obj = CybleVision(config)
+    endpoint = "/engine/api/v1/y/vulnerability/cve/{cve}".format(cve=params['cve'])
+    response = obj.make_request(endpoint=endpoint)
+    return response
+
+
+def fetch_services(config, params):
+    obj = CybleVision(config)
+    response = obj.make_request(endpoint="/apollo/api/v1/y/services")
+    return response
+
+
+def make_generic_request(config, params):
+    """Generic action to make custom API requests"""
+    api = CybleVision(config)
+
+    endpoint = params.get('endpoint')
+    if not endpoint:
+        raise ConnectorError('Endpoint parameter is required')
+
+    method = params.get('method', 'GET').upper()
+    if method not in ['GET', 'POST', 'PUT', 'DELETE']:
+        raise ConnectorError(f'Unsupported HTTP method: {method}')
+
+    request_params = params.get('params')
+    if not request_params:
+        request_params = {}
+    data = params.get('data')
+    if not data:
+        data = {}
+    headers = params.get('headers')
+    if not headers:
+        headers = {}
+
+    print(
+        f"Making request with endpoint: {endpoint}, method: {method}, params: {request_params}, data: {data}, headers: {headers}")
+    return api.make_request(
+        endpoint=endpoint,
+        method=method,
+        params=request_params,
+        data=data,
+        headers=headers
+    )
 
 
 def check_health_ext(config):
     try:
         obj = CybleVision(config)
-        server_response = obj.make_request(endpoint='/api/v2/events/types')
+        params = {"limit": "1"}
+        server_response = obj.make_request(endpoint='/apollo/api/v1/y/services', params=params)
         if server_response:
             return True
     except Exception as err:
@@ -121,5 +358,12 @@ def check_health_ext(config):
 operations = {
     'fetch_indicators': fetch_indicators,
     'fetch_alerts': fetch_alerts,
-    'fetch_event_detail': fetch_event_detail
+    'fetch_services': fetch_services,
+    'add_comment_to_alert': add_comment_to_alert,
+    'list_advisories': list_advisories,
+    'get_advisory_details': get_advisory_details,
+    'fetch_companies': fetch_companies,
+    'fetch_ip_details': fetch_ip_details,
+    'fetch_cve_details': fetch_cve_details,
+    'make_generic_request': make_generic_request
 }

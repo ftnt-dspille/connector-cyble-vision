@@ -1,7 +1,7 @@
 {
   "name": "cyble-vision",
   "label": "Cyble Vision",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Cyble Threat Intel is an integration which will help users to fetch Cyble's TAXII Feed service into Environment.",
   "publisher": "Fortinet",
   "cs_approved": false,
@@ -68,6 +68,79 @@
       "output_schema": {},
       "parameters": [
         {
+          "title": "IOC value",
+          "name": "ioc",
+          "visible": true,
+          "required": false,
+          "editable": true,
+          "type": "text",
+          "tooltip": "A string representing the IoC to query for.",
+          "description": "A string representing the IoC to query for"
+        },
+        {
+          "title": "Type",
+          "name": "type",
+          "visible": true,
+          "required": false,
+          "editable": true,
+          "type": "select",
+          "options": [
+            "Domain",
+            "FileHash-MD5",
+            "FileHash-SHA1",
+            "FileHash-SHA256",
+            "IPv4",
+            "IPv6",
+            "URL",
+            "Email"
+          ],
+          "tooltip": "Specify the type for which the indicators to retrieve. e.g. CIDR, CVE, domain, email, FileHash-IMPHASH, FileHash-MD5, FileHash-PEHASH, FileHash-SHA1, FileHash-SHA256, FilePath, hostname, IPv4, IPv6, Mutex, NIDS, URI, URL, YARA, osquery, Ja3, Bitcoinaddress, Sslcertfingerprint.",
+          "description": "(Optional) Specify the type for which the indicators to retrieve from Cyble Vision. e.g. CIDR, CVE, domain, email, FileHash-IMPHASH, FileHash-MD5, FileHash-PEHASH, FileHash-SHA1, FileHash-SHA256, FilePath, hostname, IPv4, IPv6, Mutex, NIDS, URI, URL, YARA, osquery, Ja3, Bitcoinaddress, Sslcertfingerprint."
+        },
+        {
+          "title": "Limit",
+          "name": "limit",
+          "visible": true,
+          "required": false,
+          "editable": true,
+          "type": "integer",
+          "value": 10,
+          "tooltip": "The maximum number of results to return. Default value is 10.",
+          "description": "(Optional) Specify the maximum number of records that this operation should return. Default value is 10."
+        },
+        {
+          "title": "Order",
+          "name": "order",
+          "visible": true,
+          "required": false,
+          "editable": true,
+          "type": "select",
+          "options": [
+            "asc",
+            "desc "
+          ],
+          "value": "asc",
+          "tooltip": "string indicating the order of the results. It can be asc for ascending or desc for descending. Optional, defaults to asc.",
+          "description": "string indicating the order of the results. It can be asc for ascending or desc for descending. Optional, defaults to asc."
+        },
+        {
+          "title": "Sort By",
+          "name": "sortBy",
+          "visible": true,
+          "required": false,
+          "editable": true,
+          "type": "select",
+          "options": [
+            "confident_rating",
+            "risk_rating",
+            "last_seen",
+            "first_seen"
+          ],
+          "value": "first_seen",
+          "tooltip": "A string indicating the field to sort based on the columns confident_rating, risk_rating, last_seen, and first_seen. Optional.",
+          "description": "A string indicating the field to sort based on the columns confident_rating, risk_rating, last_seen, and first_seen. Optional."
+        },
+        {
           "title": "Start Time",
           "name": "begin",
           "visible": true,
@@ -86,38 +159,6 @@
           "type": "datetime",
           "tooltip": "(Optional) Specify the end date and time till when to retrieve the list of executed reports from Cyble Vision.",
           "description": "Specify the end date and time till when to retrieve the list of executed reports from Cyble Vision."
-        },
-        {
-          "title": "Offset",
-          "name": "from",
-          "visible": true,
-          "required": false,
-          "editable": true,
-          "type": "integer",
-          "value": 0,
-          "tooltip": "The maximum number of results to return. Default value is 50.",
-          "description": "(Optional) Specify the maximum number of records that this operation should return. Default value is 50."
-        },
-        {
-          "title": "Limit",
-          "name": "limit",
-          "visible": true,
-          "required": false,
-          "editable": true,
-          "type": "integer",
-          "value": 50,
-          "tooltip": "The maximum number of results to return. Default value is 50.",
-          "description": "(Optional) Specify the maximum number of records that this operation should return. Default value is 50."
-        },
-        {
-          "title": "Type",
-          "name": "type",
-          "visible": true,
-          "required": false,
-          "editable": true,
-          "type": "text",
-          "tooltip": "Specify the type for which the indicators to retrieve. e.g. CIDR, CVE, domain, email, FileHash-IMPHASH, FileHash-MD5, FileHash-PEHASH, FileHash-SHA1, FileHash-SHA256, FilePath, hostname, IPv4, IPv6, Mutex, NIDS, URI, URL, YARA, osquery, Ja3, Bitcoinaddress, Sslcertfingerprint.",
-          "description": "(Optional) Specify the type for which the indicators to retrieve from Cyble Vision. e.g. CIDR, CVE, domain, email, FileHash-IMPHASH, FileHash-MD5, FileHash-PEHASH, FileHash-SHA1, FileHash-SHA256, FilePath, hostname, IPv4, IPv6, Mutex, NIDS, URI, URL, YARA, osquery, Ja3, Bitcoinaddress, Sslcertfingerprint."
         }
       ]
     },
@@ -131,126 +172,428 @@
       "output_schema": {},
       "parameters": [
         {
-          "title": "Start Time",
-          "name": "begin",
+          "title": "Sort by",
+          "type": "select",
+          "name": "sortBy",
+          "required": false,
           "visible": true,
-          "required": true,
           "editable": true,
+          "value": "desc",
+          "tooltip": "The order by which you want to sort the alerts.",
+          "options": [
+            "asc",
+            "desc"
+          ]
+        },
+        {
+          "title": "Start Time",
           "type": "datetime",
-          "tooltip": "(Optional) Specify the start date and time from when to retrieve the indicators from Cyble Vision.",
-          "description": "Specify the start date and time from when to retrieve the indicators from Cyble Vision."
+          "name": "begin",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "tooltip": "(Optional) Specify the start date and time from when to retrieve the alerts from Cyble Vision."
         },
         {
           "title": "End Time",
-          "name": "end",
-          "visible": true,
-          "required": true,
-          "editable": true,
           "type": "datetime",
-          "tooltip": "(Optional) Specify the end date and time till when to retrieve the list of executed reports from Cyble Vision.",
-          "description": "Specify the end date and time till when to retrieve the list of executed reports from Cyble Vision."
+          "name": "end",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "tooltip": "(Optional) Specify the end date and time till when to retrieve the list of alerts from Cyble Vision."
         },
         {
-          "title": "Offset",
-          "name": "from",
+          "title": "Severity",
+          "type": "multiselect",
+          "name": "severity",
+          "required": false,
           "visible": true,
-          "required": true,
           "editable": true,
-          "type": "integer",
-          "value": 0,
-          "tooltip": "The maximum number of results to return. Default value is 50.",
-          "description": "(Optional) Specify the maximum number of records that this operation should return. Default value is 50."
+          "value": "",
+          "options": [
+            "HIGH",
+            "MEDIUM",
+            "LOW"
+          ]
+        },
+        {
+          "title": "Status",
+          "type": "multiselect",
+          "name": "status",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "options": [
+            "VIEWED",
+            "UNREVIEWED",
+            "CONFIRMED_INCIDENT",
+            "UNDER_REVIEW",
+            "INFORMATIONAL"
+          ],
+          "value": ""
+        },
+        {
+          "title": "Service",
+          "type": "select",
+          "name": "service",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "value": "Data Breaches",
+          "options": [
+            "Data Breaches",
+            "Ransomware Forum Mentions",
+            "Compromised Endpoints",
+            "I2P Links",
+            "Tor Links",
+            "Cybercrime Forum Mentions",
+            "Darkweb Marketplaces",
+            "Telegram Mentions",
+            "Discord Mentions",
+            "Compromised Cards",
+            "Product Vulnerability",
+            "Code Analysis - Github",
+            "Code Analysis - Bitbucket",
+            "Cloud Storage",
+            "File Hashes",
+            "Domain Expiry",
+            "Subdomains",
+            "Assets",
+            "New Port",
+            "New Vulnerability - CVE",
+            "IP Risk Score",
+            "Asset SSL Expiry",
+            "SPF Monitoring",
+            "DNS Zone Monitoring",
+            "DMARC Monitoring",
+            "BIMI Monitoring",
+            "DKIM Monitoring",
+            "Mobile Apps",
+            "OSINT",
+            "Suspicious Domains",
+            "Phishing Monitoring",
+            "Takedown",
+            "Social Media Monitoring",
+            "Defacement URL",
+            "Defacement Content",
+            "Defacement Keyword",
+            "IoCs",
+            "Botnet",
+            "Cyble Research Labs Advisory",
+            "Cyble Research Labs",
+            "News Flash"
+          ]
         },
         {
           "title": "Limit",
-          "name": "limit",
-          "visible": true,
-          "required": true,
-          "editable": true,
           "type": "integer",
+          "name": "limit",
+          "required": false,
+          "visible": true,
+          "editable": true,
           "value": 50,
-          "tooltip": "The maximum number of results to return. Default value is 50.",
-          "description": "(Optional) Specify the maximum number of records that this operation should return. Default value is 50."
-        },
-        {
-          "title": "Sort by Order",
-          "required": true,
-          "editable": true,
-          "visible": true,
-          "type": "select",
-          "options": [
-            "Ascending",
-            "Descending"
-          ],
-          "name": "order",
-          "value": "Ascending",
-          "tooltip": "The order by which you want to sort the alerts.",
-          "description": "Specify the sorting order of the result. You choose from following options: Ascending or Descending."
-        },
-        {
-          "title": "Priority",
-          "name": "priority",
-          "visible": true,
-          "required": true,
-          "editable": true,
-          "type": "text",
-          "tooltip": "Specify the priority for which the alerts to retrieve. e.g. high,medium,low,informational.",
-          "description": "(Optional) Specify the type for which the alerts to retrieve from Cyble Vision. e.g. high,medium,low,informational."
+          "tooltip": "The maximum number of results to return. Default value is 50."
         }
-      ]
+      ],
+      "open": false
     },
     {
-      "operation": "fetch_event_detail",
-      "title": "Fetch Event Detail",
-      "description": "Retrieves event details based on the event type, event ID, limit, offset parameters that you have specified.",
+      "operation": "fetch_services",
+      "title": "Fetch Services",
+      "description": "Retrieves services based on the start time, end time, limit, offset other parameters that you have specified.",
       "category": "investigation",
-      "annotation": "fetch_event_detail",
+      "annotation": "fetch_services",
       "enabled": true,
-      "output_schema": {},
+      "output_schema": {
+        "data": [
+          {
+            "displayName": "",
+            "name": ""
+          }
+        ],
+        "success": "",
+        "meta": {}
+      },
+      "parameters": []
+    },
+    {
+      "title": "List Advisories",
+      "operation": "list_advisories",
+      "description": "fetch the list of advisories.",
       "parameters": [
         {
-          "title": "Event Type",
-          "name": "event_type",
-          "visible": true,
-          "required": true,
-          "editable": true,
-          "type": "text",
-          "tooltip": "Specify the event type whose details to retrieve from Cyble Vision.",
-          "description": "Specify the event type whose details to retrieve from Cyble Vision."
-        },
-        {
-          "title": "Event ID",
-          "name": "event_id",
-          "visible": true,
-          "required": true,
-          "editable": true,
-          "type": "text",
-          "tooltip": "Specify the event ID whose details to retrieve from Cyble Vision.",
-          "description": "Specify the event ID whose details to retrieve from Cyble Vision."
-        },
-        {
-          "title": "Offset",
+          "title": "From",
+          "type": "date",
           "name": "from",
+          "required": false,
           "visible": true,
-          "required": true,
           "editable": true,
-          "type": "integer",
-          "value": 0,
-          "tooltip": "The maximum number of results to return. Default value is 50.",
-          "description": "(Optional) Specify the maximum number of records that this operation should return. Default value is 50."
+          "value": "2025-01-10T09:00:00.000000Z",
+          "tooltip": "Starting date range for which advisories should be retrieved."
+        },
+        {
+          "title": "To",
+          "type": "date",
+          "name": "to",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "value": "2025-01-11T09:00:00.000000Z",
+          "tooltip": "End date range for which advisories should be retrieved."
+        },
+        {
+          "title": "Sort By",
+          "type": "text",
+          "name": "sortBy",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "value": "publish_date",
+          "tooltip": "The field to sort the advisories by. Possible values: publish_date."
+        },
+        {
+          "title": "Order",
+          "type": "select",
+          "name": "order",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "value": "asc",
+          "tooltip": "The order in which advisories should be sorted. Possible values: asc (ascending), desc (descending). Default: desc.",
+          "options": [
+            "asc",
+            "desc"
+          ]
         },
         {
           "title": "Limit",
-          "name": "limit",
-          "visible": true,
-          "required": true,
-          "editable": true,
           "type": "integer",
-          "value": 50,
-          "tooltip": "The maximum number of results to return. Default value is 50.",
-          "description": "(Optional) Specify the maximum number of records that this operation should return. Default value is 50."
+          "name": "limit",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "value": 10,
+          "tooltip": "The maximum number of advisories to retrieve per request. Default: 10."
+        },
+        {
+          "title": "Page",
+          "type": "integer",
+          "name": "page",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "value": 1,
+          "tooltip": "The page number of the results to retrieve. Default: 1."
+        },
+        {
+          "title": "Custom Tags",
+          "type": "text",
+          "name": "customTags",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "value": "",
+          "tooltip": "Custom tags to filter advisories. Commas can separate multiple values."
+        },
+        {
+          "title": "Countries",
+          "type": "text",
+          "name": "countries",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "value": "",
+          "tooltip": "Countries to filter advisories. Commas can separate multiple values."
+        },
+        {
+          "title": "Vulnerabilities",
+          "type": "text",
+          "name": "vulnerabilities",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "value": "",
+          "tooltip": "Vulnerabilities to filter advisories. Commas can separate multiple values."
         }
-      ]
+      ],
+      "open": false,
+      "annotation": "list_advisories",
+      "category": "investigation"
+    },
+    {
+      "title": "Get advisory details",
+      "operation": "get_advisory_details",
+      "annotation": "get_advisory_details",
+      "description": "Get advisory details using Advisory ID",
+      "parameters": [
+        {
+          "title": "Advisory ID",
+          "type": "text",
+          "name": "advisoryID",
+          "required": true,
+          "visible": true,
+          "editable": true,
+          "value": "",
+          "tooltip": "Get advisory details using Advisory ID"
+        }
+      ],
+      "open": false,
+      "category": "investigation"
+    },
+    {
+      "title": "Fetch Companies",
+      "operation": "fetch_companies",
+      "annotation": "fetch_companies",
+      "description": "To retrieve users for company using the API endpoint.",
+      "parameters": [],
+      "open": false,
+      "category": "investigation"
+    },
+    {
+      "title": "Fetch IP Details",
+      "operation": "fetch_ip_details",
+      "annotation": "fetch_ip_details",
+      "description": "retrieve detailed information about an IP address, including domain information, geolocation, SSL details, risk assessment, and more.",
+      "parameters": [
+        {
+          "title": "company Id",
+          "type": "text",
+          "name": "companyId",
+          "required": true,
+          "visible": true,
+          "editable": true,
+          "value": "",
+          "tooltip": "the Company UUID - Cyble Vision registered companies"
+        },
+        {
+          "title": "Address IP",
+          "type": "ipv4",
+          "name": "addressIP",
+          "required": true,
+          "visible": true,
+          "editable": true,
+          "value": null
+        }
+      ],
+      "open": false,
+      "category": "investigation"
+    },
+    {
+      "title": "Add Comment to Alert",
+      "operation": "add_comment_to_alert",
+      "description": "Add Comment to Alert",
+      "annotation": "add_comment_to_alert",
+      "parameters": [
+        {
+          "title": "Alert ID",
+          "type": "text",
+          "name": "alertID",
+          "required": true,
+          "visible": true,
+          "editable": true,
+          "value": "",
+          "tooltip": "The unique identifier of the alert for which you want to add comments"
+        },
+        {
+          "title": "Comment",
+          "type": "text",
+          "name": "comment",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "value": "",
+          "tooltip": "An optional parameter for creating a new comment. Use this parameter to specify the comment content you want to add to the alert."
+        }
+      ],
+      "open": false,
+      "category": "utilities"
+    },
+    {
+      "title": "Fetch CVE Details",
+      "operation": "fetch_cve_details",
+      "annotation": "fetch_cve_details",
+      "description": "Retrieve Common Vulnerability and Exposure (CVE) details",
+      "parameters": [
+        {
+          "title": "CVE ID",
+          "type": "text",
+          "name": "cve",
+          "required": true,
+          "visible": true,
+          "editable": true,
+          "value": "",
+          "tooltip": "CVE identifier for the specific vulnerability you want to retrieve details for."
+        }
+      ],
+      "open": false,
+      "category": "investigation"
+    },
+    {
+      "operation": "make_generic_request",
+      "title": "Make Generic Request",
+      "description": "Make a custom API request to Cyble Vision",
+      "category": "investigation",
+      "annotation": "make_generic_request",
+      "parameters": [
+        {
+          "name": "endpoint",
+          "title": "API Endpoint",
+          "type": "text",
+          "required": true,
+          "visible": true,
+          "editable": true,
+          "description": "API endpoint path (e.g., /engine/api/v2/y/iocs)",
+          "tooltip": "API endpoint path (e.g., /engine/api/v2/y/iocs)",
+          "value": ""
+        },
+        {
+          "name": "method",
+          "title": "HTTP Method",
+          "type": "select",
+          "options": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE"
+          ],
+          "required": true,
+          "visible": true,
+          "editable": true,
+          "value": "GET",
+          "description": "HTTP method for the request"
+        },
+        {
+          "name": "params",
+          "title": "Query Parameters",
+          "type": "json",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "description": "Query parameters as JSON object"
+        },
+        {
+          "name": "data",
+          "title": "Request Body",
+          "type": "json",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "description": "Request body as JSON object"
+        },
+        {
+          "name": "headers",
+          "title": "Additional Headers",
+          "type": "json",
+          "required": false,
+          "visible": true,
+          "editable": true,
+          "description": "Additional request headers as JSON object"
+        }
+      ],
+      "output_schema": {
+        "response": {}
+      }
     }
   ]
 }
