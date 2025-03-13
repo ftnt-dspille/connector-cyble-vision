@@ -95,6 +95,17 @@ def handle_datetime(date_ts: str) -> str:
         raise ConnectorError(f"Invalid datetime format: {date_ts}")
 
 
+def remove_empty_params(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove empty parameters from the dictionary"""
+    return {k: v for k, v in params.items() if v}
+
+
+def get_service_mapping(config) -> Dict[str, str]:
+    """Get service mapping"""
+    services = fetch_services(config, {})
+    return {item['displayName']: item['name'] for item in services['data']}
+
+
 def build_ioc_params(params: Dict[str, Any]) -> Dict[str, Any]:
     """Build parameters for IOC request"""
     ioc_params = {
@@ -171,47 +182,90 @@ def fetch_indicators(config: Dict[str, Any], params: Dict[str, Any]) -> Dict[str
 
 
 def build_alert_params(input_params: Dict[str, Any]) -> Dict[str, Any]:
-    """Build the alert request structure"""
+    """Build the alert request structure
+
+    Args:
+        input_params (Dict[str, Any]): Dictionary containing alert parameter options
+
+    Returns:
+        Dict[str, Any]: Structured alert parameters
+    """
+    input_params = remove_empty_params(input_params)
+
+    # Define default values and extract parameters
+    sort_direction = input_params.get('sortBy', 'asc')
+    page_limit = int(input_params.get('limit', 100))
+    date_begin = input_params.get('begin', '')
+    date_end = input_params.get('end', '')
+
+    # Define default status options
+    default_status = [
+        "VIEWED",
+        "UNREVIEWED",
+        "CONFIRMED_INCIDENT",
+        "UNDER_REVIEW",
+        "INFORMATIONAL"
+    ]
+    status_options = input_params.get("status", default_status)
+
+    # Define default severity levels
+    default_severity = [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+    ]
+    severity_levels = input_params.get("severity", default_severity)
+
+    # Define default services
+    default_services = []
+    service_options = input_params.get("service", default_services)
+    if not service_options:
+
+    # Define fields to select
+    select_fields = {
+        "alert_group_id": True,
+        "archive_date": True,
+        "archived": True,
+        "assignee_id": True,
+        "assignment_date": True,
+        "created_at": True,
+        "data_id": True,
+        "deleted_at": True,
+        "description": True,
+        "hash": True,
+        "id": True,
+        "metadata": True,
+        "risk_score": True,
+        "service": True,
+        "severity": True,
+        "status": True,
+        "tags": True,
+        "updated_at": True,
+        "user_severity": True
+    }
+
+    # Build and return the complete structure
     return {
-        "orderBy": [{"created_at": input_params.get('sortBy', 'asc')}],
-        "select": {
-            "alert_group_id": True,
-            "archive_date": True,
-            "archived": True,
-            "assignee_id": True,
-            "assignment_date": True,
-            "created_at": True,
-            "data_id": True,
-            "deleted_at": True,
-            "description": True,
-            "hash": True,
-            "id": True,
-            "metadata": True,
-            "risk_score": True,
-            "service": True,
-            "severity": True,
-            "status": True,
-            "tags": True,
-            "updated_at": True,
-            "user_severity": True
-        },
+        "orderBy": [{"created_at": sort_direction}],
+        "select": select_fields,
         "skip": 0,
-        "take": input_params.get('limit', 100),
+        "take": page_limit,
         "withDataMessage": True,
         "where": {
             "created_at": {
-                "gte": input_params.get('begin', ''),
-                "lte": input_params.get('end', '')
+                "gte": date_begin,
+                "lte": date_end
             },
             "status": {
-                "in": [
-                    "VIEWED",
-                    "UNREVIEWED",
-                    "CONFIRMED_INCIDENT",
-                    "UNDER_REVIEW",
-                    "INFORMATIONAL"
-                ]
-            }
+                "in": status_options,
+            },
+            "severity": {
+                "in": severity_levels,
+            },
+            "service": {
+                "in": service_options,
+            },
         }
     }
 
@@ -236,7 +290,6 @@ def fetch_alerts(config: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, An
         alert_params = build_alert_params(params)
 
         print(f"Fetching alerts with params: {alert_params}")
-
         # Make API request
         response = api.make_request(
             endpoint="/apollo/api/v1/y/alerts",
@@ -244,7 +297,7 @@ def fetch_alerts(config: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, An
             data=alert_params,
             headers={"Content-Type": "application/json"}
         )
-
+        print(f"Fetched {len(response['data'])} alerts")
         return response
 
     except Exception as e:
@@ -285,6 +338,7 @@ def get_advisory_details(config, params):
 
 def fetch_companies(config, params):
     obj = CybleVision(config)
+    print("config", config)
     response = obj.make_request(endpoint="/apollo/api/v1/y/companies")
     return response
 
